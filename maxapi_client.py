@@ -23,9 +23,6 @@ from typing import Any, Callable
 import certifi
 import requests
 
-self.session = requests.Session()
-self.session.verify = certifi.where()
-
 log = logging.getLogger("maxapi")
 
 #: Максимальная длина текста сообщения в MAX.
@@ -38,6 +35,8 @@ class MaxApiError(Exception):
     """Ошибка ответа MAX API."""
 
     def __init__(self, status: int, body: str):
+        self.session = requests.Session()
+        self.session.verify = certifi.where()
         self.status = status
         self.body = body
         super().__init__(f"MAX API error {status}: {body[:300]}")
