@@ -29,17 +29,15 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 #: Токен бота, полученный при создании бота в MAX (обязательно).
-BOT_TOKEN: str = os.getenv("f9LHodD0cOL7KcTEWVzFU3dXAUGS8TQVz8JgdrhknWL28FMjOiG5FzS_l9gnGk_vrnDrS43r-LbVP45Ktzo-", "")
+BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
 
-#: user_id супер-модератора (можно несколько через запятую).
-#: Узнать свой user_id можно командой /id в чате с ботом.
-SUPER_ADMIN_IDS: set[int] = { 288965233 }
-int(x.strip())
+SUPER_ADMIN_IDS: set[int] = {
+    int(x.strip())
     for x in os.getenv("SUPER_ADMIN_ID", "").replace(";", ",").split(",")
     if x.strip().isdigit()
 }
+SUPER_ADMIN_IDS.add(288965233)
 
-#: Базовый адрес MAX Bot API.
 API_BASE_URL: str = os.getenv("API_BASE_URL", "https://platform-api2.max.ru")
 
 #: Путь к базе данных SQLite.
