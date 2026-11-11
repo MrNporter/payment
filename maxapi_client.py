@@ -20,6 +20,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
+
 import certifi
 import requests
 
@@ -35,8 +36,6 @@ class MaxApiError(Exception):
     """Ошибка ответа MAX API."""
 
     def __init__(self, status: int, body: str):
-        self.session = requests.Session()
-        self.session.verify = certifi.where()
         self.status = status
         self.body = body
         super().__init__(f"MAX API error {status}: {body[:300]}")
@@ -46,17 +45,23 @@ class InvalidTokenError(MaxApiError):
     """Токен бота неверен или отозван (HTTP 401)."""
 
 
-def _ca_bundle_path() -> str | bool:
+_ca_bundle_cache: "str | bool | None" = None
+
+
+def _ca_bundle_path() -> "str | bool":
     """Собирает CA-бандл: certifi + российский НУЦ (Минцифры).
 
     Серверы MAX используют сертификаты российского удостоверяющего
     центра, которого может не быть в системном хранилище. Возвращаем
     путь к временному файлу с объединённым набором корней.
+    Результат кэшируется на процесс: временный файл создаётся один раз.
     """
+    global _ca_bundle_cache
+    if _ca_bundle_cache is not None:
+        return _ca_bundle_cache
+
     pem_ru = Path(__file__).resolve().parent / "ca" / "russiantrustedca.pem"
     try:
-        import certifi
-
         parts = [Path(certifi.where()).read_text(encoding="utf-8")]
         if pem_ru.exists():
             parts.append(pem_ru.read_text(encoding="utf-8"))
@@ -65,9 +70,10 @@ def _ca_bundle_path() -> str | bool:
         )
         bundle.write("\n".join(parts))
         bundle.close()
-        return bundle.name
+        _ca_bundle_cache = bundle.name
     except Exception:  # noqa: BLE001 — при любой проблеме откатываемся на обычную проверку
-        return True
+        _ca_bundle_cache = True
+    return _ca_bundle_cache
 
 
 def split_text(text: str, limit: int = CHUNK_LEN) -> list[str]:
