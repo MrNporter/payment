@@ -20,8 +20,11 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
-
+import certifi
 import requests
+
+self.session = requests.Session()
+self.session.verify = certifi.where()
 
 log = logging.getLogger("maxapi")
 
