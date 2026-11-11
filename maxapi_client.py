@@ -49,6 +49,56 @@ _ca_bundle_cache: "str | bool | None" = None
 
 
 def _ca_bundle_path() -> "str | bool":
+    import re
+
+def _validate_pem(text: str, name: str) -> bool:
+    """Проверяет, что в тексте есть хотя бы один PEM-блок сертификата."""
+    blocks = re.findall(
+        r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
+        text, re.DOTALL,
+    )
+    log.info("PEM %s: найдено блоков сертификата: %d", name, len(blocks))
+    if not blocks:
+        log.error("PEM %s: НЕТ валидных блоков! Первые 120 символов: %r",
+                  name, text[:120])
+        return False
+    return True
+
+
+def _ca_bundle_path() -> "str | bool":
+    global _ca_bundle_cache
+    if _ca_bundle_cache is not None:
+        return _ca_bundle_cache
+
+    pem_ru = Path(__file__).resolve().parent / "ca" / "russiantrustedca.pem"
+    try:
+        base = Path(certifi.where()).read_text(encoding="utf-8")
+        _validate_pem(base, "certifi")
+
+        parts = [base]
+        if pem_ru.exists():
+            ru_text = pem_ru.read_text(encoding="utf-8", errors="replace")
+            log.info("ru file: %s size=%s", pem_ru, len(ru_text))
+            log.info("ru first line: %r", ru_text.splitlines()[0] if ru_text else "")
+            if _validate_pem(ru_text, "russiantrustedca.pem"):
+                parts.append(ru_text)
+            else:
+                log.error("ru file не является PEM — корень НЕ добавлен")
+        else:
+            log.error("ru file НЕ найден: %s", pem_ru)
+
+        bundle = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".pem", delete=False, encoding="utf-8"
+        )
+        bundle.write("\n".join(parts))
+        bundle.close()
+        _ca_bundle_cache = bundle.name
+        log.info("CA bundle: %s (размер %d байт)",
+                 _ca_bundle_cache, Path(_ca_bundle_cache).stat().st_size)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("CA bundle: ошибка сборки (%s)", exc)
+        _ca_bundle_cache = True
+    return _ca_bundle_cache
     """Собирает CA-бандл: certifi + российский НУЦ (Минцифры).
 
     Серверы MAX используют сертификаты российского удостоверяющего
