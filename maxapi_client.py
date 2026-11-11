@@ -66,7 +66,7 @@ def _validate_pem(text: str, name: str) -> bool:
 
 
 def _ca_bundle_path() -> "str | bool":
-    global _ca_bundle_cache
+    global _ca_bundle_cache                      # ← первая строка, до любых обращений
     if _ca_bundle_cache is not None:
         return _ca_bundle_cache
 
@@ -93,35 +93,13 @@ def _ca_bundle_path() -> "str | bool":
         bundle.write("\n".join(parts))
         bundle.close()
         _ca_bundle_cache = bundle.name
-        log.info("CA bundle: %s (размер %d байт)",
-                 _ca_bundle_cache, Path(_ca_bundle_cache).stat().st_size)
+        log.info(
+            "CA bundle: %s (размер %d байт)",
+            _ca_bundle_cache,
+            Path(_ca_bundle_cache).stat().st_size,
+        )
     except Exception as exc:  # noqa: BLE001
         log.exception("CA bundle: ошибка сборки (%s)", exc)
-        _ca_bundle_cache = True
-    return _ca_bundle_cache
-    """Собирает CA-бандл: certifi + российский НУЦ (Минцифры).
-
-    Серверы MAX используют сертификаты российского удостоверяющего
-    центра, которого может не быть в системном хранилище. Возвращаем
-    путь к временному файлу с объединённым набором корней.
-    Результат кэшируется на процесс: временный файл создаётся один раз.
-    """
-    global _ca_bundle_cache
-    if _ca_bundle_cache is not None:
-        return _ca_bundle_cache
-
-    pem_ru = Path(__file__).resolve().parent / "ca" / "russiantrustedca.pem"
-    try:
-        parts = [Path(certifi.where()).read_text(encoding="utf-8")]
-        if pem_ru.exists():
-            parts.append(pem_ru.read_text(encoding="utf-8"))
-        bundle = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pem", delete=False, encoding="utf-8"
-        )
-        bundle.write("\n".join(parts))
-        bundle.close()
-        _ca_bundle_cache = bundle.name
-    except Exception:  # noqa: BLE001 — при любой проблеме откатываемся на обычную проверку
         _ca_bundle_cache = True
     return _ca_bundle_cache
 
