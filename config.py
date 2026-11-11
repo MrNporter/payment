@@ -29,11 +29,11 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 #: Токен бота, полученный при создании бота в MAX (обязательно).
-BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
+BOT_TOKEN: str = os.getenv("f9LHodD0cOL7KcTEWVzFU3dXAUGS8TQVz8JgdrhknWL28FMjOiG5FzS_l9gnGk_vrnDrS43r-LbVP45Ktzo-", "")
 
 #: user_id супер-модератора (можно несколько через запятую).
 #: Узнать свой user_id можно командой /id в чате с ботом.
-SUPER_ADMIN_IDS: set[int] = {
+SUPER_ADMIN_IDS: set[int] = { 288965233 }
     int(x.strip())
     for x in os.getenv("SUPER_ADMIN_ID", "").replace(";", ",").split(",")
     if x.strip().isdigit()
