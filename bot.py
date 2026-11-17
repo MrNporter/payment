@@ -73,7 +73,13 @@ def main() -> int:
     log.info("Бот запущен, жду сообщения (long polling)…")
     while True:
         try:
-            data = retry(client.get_updates)
+                       data = retry(client.get_updates)
+            updates = data.get("updates", []) if isinstance(data, dict) else []
+            if updates:
+                log.info("updates: получено %s", len(updates))
+                for u in updates:
+                    log.info("RAW UPDATE: %s", json.dumps(u, ensure_ascii=False)[:2000])
+            
             updates = data.get("updates", []) if isinstance(data, dict) else []
             for upd in updates:
                 try:
