@@ -296,20 +296,7 @@ class Database:
     # ------------------------------------------------------------------ #
     # Дети и заявки
     # ------------------------------------------------------------------ #
-    def add_child(
-        self, parent_id: int, last_name: str, first_name: str, section_id: int
-    ) -> int:
-        with self._lock:
-            cur = self._conn.execute(
-                "INSERT INTO children (parent_id, last_name, first_name,"
-                " section_id, status, created_at)"
-                " VALUES (?, ?, ?, ?, 'pending', ?)",
-                (parent_id, last_name, first_name, section_id, utcnow()),
-            )
-            self._conn.commit()
-            return int(cur.lastrowid)
-
-    def get_child(self, child_id: int) -> sqlite3.Row | None:
+   def get_child(self, child_id: int) -> sqlite3.Row | None:
         with self._lock:
             return self._conn.execute(
                 "SELECT * FROM children WHERE id = ?", (child_id,)
