@@ -93,10 +93,10 @@ def main() -> int:
                     log.exception("Ошибка обработки обновления: %r", upd)
         except InvalidTokenError:
             log.error("Токен стал недействительным (401). Останавливаюсь.")
-            return 1
+                return 1
         except KeyboardInterrupt:
             log.info("Остановлено пользователем")
-            return 0
+                return 0
         except Exception:  # noqa: BLE001
             log.exception("Сбой цикла polling, пауза 3 секунды")
             time.sleep(3)
