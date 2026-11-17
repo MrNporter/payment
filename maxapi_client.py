@@ -184,9 +184,10 @@ class MaxClient:
     def get_updates(self) -> dict[str, Any]:
         """Long polling: GET /updates. Возвращает {'updates': [...], 'marker': N}."""
         params: dict[str, Any] = {
-            "timeout": self.poll_timeout,
-            "limit": 100,
-            "types": "message_created,message_callback,bot_started",
+    "timeout": self.poll_timeout,
+    "limit": 100,
+    "types": ["message_created", "message_callback", "bot_started"],
+}
         }
         if self.marker is not None:
             params["marker"] = self.marker
