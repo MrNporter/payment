@@ -77,15 +77,14 @@ def main() -> int:
         try:
             data = retry(client.get_updates)
             updates = data.get("updates", []) if isinstance(data, dict) else []
-
-            # Диагностика: показываем, что реально приходит от API.
-            # Можно убрать после отладки.
-            if updates:
-                log.info("updates: получено %s, marker=%s",
-                         len(updates), data.get("marker"))
+             # Диагностика: показываем, что реально приходит от API.
+            # Только при DEBUG-уровне, чтобы не шуметь в проде.
+            if updates and log.isEnabledFor(logging.DEBUG):
+                log.debug("updates: получено %s, marker=%s",
+                          len(updates), data.get("marker"))
                 for u in updates:
-                    log.info("RAW UPDATE: %s",
-                             json.dumps(u, ensure_ascii=False)[:2000])
+                    log.debug("RAW UPDATE: %s",
+                              json.dumps(u, ensure_ascii=False)[:2000])
 
             for upd in updates:
                 try:
