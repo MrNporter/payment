@@ -26,6 +26,24 @@ def _load_dotenv() -> None:
             os.environ[key] = value
 
 
+def _env_int(name: str, default: int, *, lo: int | None = None,
+             hi: int | None = None) -> int:
+    """Читает целое из окружения; при пустом/некорректном значении
+    возвращает default. Опционально ограничивает диапазон."""
+    raw = (os.getenv(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        return default
+    if lo is not None and value < lo:
+        return default
+    if hi is not None and value > hi:
+        return default
+    return value
+
+
 _load_dotenv()
 
 #: Токен бота, полученный при создании бота в MAX (обязательно).
@@ -36,7 +54,12 @@ SUPER_ADMIN_IDS: set[int] = {
     for x in os.getenv("SUPER_ADMIN_ID", "").replace(";", ",").split(",")
     if x.strip().isdigit()
 }
-SUPER_ADMIN_IDS.add(288965233)
+
+#: Необязательный «владелец» бота — добавляется к супер-модераторам.
+#: Раньше был захардкожен — вынесен в переменную окружения OWNER_ID.
+_owner_id = os.getenv("OWNER_ID", "").strip()
+if _owner_id.isdigit():
+    SUPER_ADMIN_IDS.add(int(_owner_id))
 
 API_BASE_URL: str = os.getenv("API_BASE_URL", "https://platform-api2.max.ru")
 
@@ -44,15 +67,15 @@ API_BASE_URL: str = os.getenv("API_BASE_URL", "https://platform-api2.max.ru")
 DB_PATH: Path = Path(os.getenv("DB_PATH", DATA_DIR / "bot.db"))
 
 #: День месяца и час автоматического напоминания неоплатившим.
-REMIND_DAY: int = int(os.getenv("REMIND_DAY", "25"))
-REMIND_HOUR: int = int(os.getenv("REMIND_HOUR", "12"))
+REMIND_DAY: int = _env_int("REMIND_DAY", 25, lo=1, hi=31)
+REMIND_HOUR: int = _env_int("REMIND_HOUR", 12, lo=0, hi=23)
 
 #: Часовой пояс для расчёта времени напоминаний, например Europe/Moscow.
 #: Пусто — системный часовой пояс сервера.
 TIMEZONE: str = os.getenv("TIMEZONE", "")
 
-#: Таймаут long polling запроса, секунд (0..90).
-POLL_TIMEOUT: int = int(os.getenv("POLL_TIMEOUT", "30"))
+#: Таймаут long polling запроса, секунд (по документации MAX: 0..90).
+POLL_TIMEOUT: int = _env_int("POLL_TIMEOUT", 30, lo=0, hi=90)
 
 
 def ensure_dirs() -> None:
