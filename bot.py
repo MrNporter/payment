@@ -77,8 +77,8 @@ def main() -> int:
         try:
             data = retry(client.get_updates)
             updates = data.get("updates", []) if isinstance(data, dict) else []
-             # Диагностика: показываем, что реально приходит от API.
-            # Только при DEBUG-уровне, чтобы не шуметь в проде.
+
+            # Диагностика: выводим только при DEBUG-уровне, чтобы не шуметь.
             if updates and log.isEnabledFor(logging.DEBUG):
                 log.debug("updates: получено %s, marker=%s",
                           len(updates), data.get("marker"))
