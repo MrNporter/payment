@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 import time
@@ -69,18 +70,23 @@ def main() -> int:
 
     # Фоновые напоминания
     ReminderScheduler(app).start()
+
     # Основной цикл long polling
     log.info("Бот запущен, жду сообщения (long polling)…")
     while True:
         try:
-                       data = retry(client.get_updates)
+            data = retry(client.get_updates)
             updates = data.get("updates", []) if isinstance(data, dict) else []
+
+            # Диагностика: показываем, что реально приходит от API.
+            # Можно убрать после отладки.
             if updates:
-                log.info("updates: получено %s", len(updates))
+                log.info("updates: получено %s, marker=%s",
+                         len(updates), data.get("marker"))
                 for u in updates:
-                    log.info("RAW UPDATE: %s", json.dumps(u, ensure_ascii=False)[:2000])
-            
-            updates = data.get("updates", []) if isinstance(data, dict) else []
+                    log.info("RAW UPDATE: %s",
+                             json.dumps(u, ensure_ascii=False)[:2000])
+
             for upd in updates:
                 try:
                     app.handle_update(upd)
