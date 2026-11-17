@@ -69,18 +69,6 @@ def main() -> int:
 
     # Фоновые напоминания
     ReminderScheduler(app).start()
-    data = retry(client.get_updates)
-
-# === ДИАГНОСТИКА ===
-updates = data.get("updates") if isinstance(data, dict) else None
-log.info("updates: получено %s, marker=%s",
-         len(updates) if updates is not None else "n/a",
-         data.get("marker") if isinstance(data, dict) else "n/a")
-if updates:
-    for u in updates:
-        log.info("RAW UPDATE: %s", json.dumps(u, ensure_ascii=False)[:2000])
-# === /ДИАГНОСТИКА ===
-
     # Основной цикл long polling
     log.info("Бот запущен, жду сообщения (long polling)…")
     while True:
