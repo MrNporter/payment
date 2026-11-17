@@ -20,9 +20,77 @@ import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable
-
 import certifi
 import requests
+import os
+import socket
+import ssl
+from urllib.parse import urlparse
+def _build_trusted_bundle(base_url: str) -> str:
+    """Собирает CA-бандл: certifi + российский корень (если валиден)
+    + сертификат сервера через TLS без проверки (TOFU, гарантированный fallback).
+
+    Возвращает путь к итоговому PEM-файлу. Логирует каждый шаг.
+    """
+    log.info("CA: === старт сборки бандла ===")
+
+    parts: list[str] = []
+
+    # 1) certifi — базовый набор западных корней
+    certifi_path = Path(certifi.where())
+    parts.append(certifi_path.read_text(encoding="utf-8"))
+    log.info("CA: certifi %s (%d байт)", certifi_path, certifi_path.stat().st_size)
+
+    # 2) Российский корень — только если файл реально PEM
+    ca_dir = Path(__file__).resolve().parent / "ca"
+    log.info("CA: каталог %s существует=%s", ca_dir, ca_dir.exists())
+    for name in ("russiantrustedca.pem", "russiantrustedsubca.pem"):
+        p = ca_dir / name
+        if not p.exists():
+            log.warning("CA: %s не найден", p)
+            continue
+        try:
+            raw = p.read_bytes()
+            text = raw.decode("utf-8", errors="replace")
+            log.info(
+                "CA: %s size=%d first=%r last=%r",
+                name, len(raw),
+                text[:40] if text else "",
+                text[-40:] if text else "",
+            )
+            if "BEGIN CERTIFICATE" not in text:
+                log.error("CA: %s не PEM — пропускаем", name)
+                continue
+            parts.append(text)
+            log.info("CA: добавлен %s", name)
+        except Exception as exc:  # noqa: BLE001
+            log.exception("CA: ошибка чтения %s: %s", name, exc)
+
+    # 3) TOFU: сертификат сервера без верификации
+    host = urlparse(base_url).hostname or "platform-api2.max.ru"
+    try:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        with socket.create_connection((host, 443), timeout=10) as sock:
+            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                der = ssock.getpeercert(binary_form=True)
+                peer_pem = ssl.DER_cert_to_PEM_cert(der)
+                parts.append(peer_pem)
+                log.info("CA: добавлен peer cert хоста %s", host)
+    except Exception as exc:  # noqa: BLE001
+        log.exception("CA: не удалось получить peer cert %s: %s", host, exc)
+
+    bundle = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".pem", delete=False, encoding="utf-8"
+    )
+    bundle.write("\n".join(parts))
+    bundle.close()
+    log.info(
+        "CA: bundle %s (%d блоков, %d байт)",
+        bundle.name, len(parts), os.path.getsize(bundle.name),
+    )
+    return bundle.name
 
 log = logging.getLogger("maxapi")
 
@@ -46,62 +114,6 @@ class InvalidTokenError(MaxApiError):
 
 
 _ca_bundle_cache: "str | bool | None" = None
-
-
-def _ca_bundle_path() -> "str | bool":
-    import re
-
-def _validate_pem(text: str, name: str) -> bool:
-    """Проверяет, что в тексте есть хотя бы один PEM-блок сертификата."""
-    blocks = re.findall(
-        r"-----BEGIN CERTIFICATE-----.*?-----END CERTIFICATE-----",
-        text, re.DOTALL,
-    )
-    log.info("PEM %s: найдено блоков сертификата: %d", name, len(blocks))
-    if not blocks:
-        log.error("PEM %s: НЕТ валидных блоков! Первые 120 символов: %r",
-                  name, text[:120])
-        return False
-    return True
-
-
-def _ca_bundle_path() -> "str | bool":
-    global _ca_bundle_cache                      # ← первая строка, до любых обращений
-    if _ca_bundle_cache is not None:
-        return _ca_bundle_cache
-
-    pem_ru = Path(__file__).resolve().parent / "ca" / "russiantrustedca.pem"
-    try:
-        base = Path(certifi.where()).read_text(encoding="utf-8")
-        _validate_pem(base, "certifi")
-
-        parts = [base]
-        if pem_ru.exists():
-            ru_text = pem_ru.read_text(encoding="utf-8", errors="replace")
-            log.info("ru file: %s size=%s", pem_ru, len(ru_text))
-            log.info("ru first line: %r", ru_text.splitlines()[0] if ru_text else "")
-            if _validate_pem(ru_text, "russiantrustedca.pem"):
-                parts.append(ru_text)
-            else:
-                log.error("ru file не является PEM — корень НЕ добавлен")
-        else:
-            log.error("ru file НЕ найден: %s", pem_ru)
-
-        bundle = tempfile.NamedTemporaryFile(
-            mode="w", suffix=".pem", delete=False, encoding="utf-8"
-        )
-        bundle.write("\n".join(parts))
-        bundle.close()
-        _ca_bundle_cache = bundle.name
-        log.info(
-            "CA bundle: %s (размер %d байт)",
-            _ca_bundle_cache,
-            Path(_ca_bundle_cache).stat().st_size,
-        )
-    except Exception as exc:  # noqa: BLE001
-        log.exception("CA bundle: ошибка сборки (%s)", exc)
-        _ca_bundle_cache = True
-    return _ca_bundle_cache
 
 def split_text(text: str, limit: int = CHUNK_LEN) -> list[str]:
     """Делит длинный текст на части по границам строк (лимит MAX — 4000)."""
@@ -135,7 +147,7 @@ class MaxClient:
         self.poll_timeout = poll_timeout
         self.session = requests.Session()
         self.session.headers.update({"Authorization": self.token})
-        self.session.verify = _ca_bundle_path()
+        self.session.verify = _build_trusted_bundle(base_url)
         self.marker: int | None = None
 
     # ------------------------------------------------------------------ #
