@@ -103,7 +103,6 @@ def _ca_bundle_path() -> "str | bool":
         _ca_bundle_cache = True
     return _ca_bundle_cache
 
-
 def split_text(text: str, limit: int = CHUNK_LEN) -> list[str]:
     """Делит длинный текст на части по границам строк (лимит MAX — 4000)."""
     if len(text) <= limit:
